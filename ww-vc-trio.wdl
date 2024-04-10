@@ -38,23 +38,18 @@ workflow ww_vc_trio {
     File af_only_gnomad
     File af_only_gnomad_index
     # Note:  For Annovar, please reference: Wang K, Li M, Hakonarson H. ANNOVAR: Functional annotation of genetic variants from next-generation sequencing data Nucleic Acids Research, 38:e164, 2010
-    File annovarTAR
     String annovar_protocols
     String annovar_operation
-    ## Specific script GitHub info for consensus
-    String githubRepoURL
-    String scriptPath
-    String githubTag
   }
 
   Array[Object] batchInfo = read_objects(batchFile)
   # Docker containers this workflow has been designed for
-  String GATKDocker = "broadinstitute/gatk:4.1.8.0"
-  String bwaDocker = "fredhutch/bwa:0.7.17"
-  String bedtoolsDocker = "fredhutch/bedtools:2.28.0" 
-  String bcftoolsDocker = "fredhutch/bcftools:1.9"
-  String perlDocker = "perl:5.28.0"
-  String RDocker = "rocker/tidyverse:3.6.0"
+  String GATKDocker = "ghcr.io/getwilds/gatk:4.3.0.0"
+  String bwaDocker = "ghcr.io/getwilds/bwa:0.7.17"
+  String bedtoolsDocker = "ghcr.io/getwilds/bedtools:2.31.1" 
+  String bcftoolsDocker = "ghcr.io/getwilds/bcftools:1.19"
+  String annovarDocker = "ghcr.io/getwilds/annovar:${ref_name}"
+  String RDocker = "ghcr.io/getwilds/consensus:0.1.1"
 
   Int bwaThreads = 16
 
@@ -205,7 +200,6 @@ workflow ww_vc_trio {
       input:
         input_vcf = bcftoolsMpileup.output_vcf,
         ref_name = ref_name,
-        annovarTAR = annovarTAR,
         annovar_operation = annovar_operation,
         annovar_protocols = annovar_protocols,
         docker = perlDocker
@@ -216,7 +210,6 @@ workflow ww_vc_trio {
       input:
         input_vcf = Mutect2TumorOnly.output_vcf,
         ref_name = ref_name,
-        annovarTAR = annovarTAR,
         annovar_operation = annovar_operation,
         annovar_protocols = annovar_protocols,
         docker = perlDocker
@@ -227,7 +220,6 @@ workflow ww_vc_trio {
       input:
         input_vcf = HaplotypeCaller.output_vcf,
         ref_name = ref_name,
-        annovarTAR = annovarTAR,
         annovar_operation = annovar_operation,
         annovar_protocols = annovar_protocols,
         docker = perlDocker
@@ -239,9 +231,6 @@ workflow ww_vc_trio {
         MutectVars = annotateMutect.output_annotated_table,
         SAMVars = annotateSAM.output_annotated_table,
         base_file_name = base_file_name,
-        githubRepoURL = githubRepoURL,
-        githubTag = githubTag,
-        scriptPath = scriptPath,
         docker = RDocker
     }
   } # End scatter 
@@ -274,7 +263,6 @@ task annovar {
   input {
     File input_vcf
     String ref_name
-    File annovarTAR
     String annovar_protocols
     String annovar_operation
     String docker
@@ -284,13 +272,12 @@ task annovar {
 
   command <<<
     set -eo pipefail
-    tar -xzvf ${annovarTAR}
-    perl annovar/table_annovar.pl ${input_vcf} annovar/humandb/ \
-      -buildver ${ref_name} \
-      -outfile ${base_vcf_name} \
+    perl /annovar/table_annovar.pl ~{input_vcf} /annovar/humandb/ \
+      -buildver ~{ref_name} \
+      -outfile ~{base_vcf_name} \
       -remove \
-      -protocol ${annovar_protocols} \
-      -operation ${annovar_operation} \
+      -protocol ~{annovar_protocols} \
+      -operation ~{annovar_operation} \
       -nastring . -vcfinput
   >>>
 
@@ -507,16 +494,12 @@ task consensusProcessingR {
     File SAMVars
     File MutectVars
     String base_file_name
-    String githubRepoURL
-    String scriptPath
-    String githubTag
     String docker
   }
 
   command <<<
     set -eo pipefail
-    git clone --branch ${githubTag} ${githubRepoURL}
-    Rscript ${scriptPath} ${GATKVars} ${SAMVars} ${MutectVars} ${base_file_name} 
+    Rscript consensus-trio-unpaired.R ${GATKVars} ${SAMVars} ${MutectVars} ${base_file_name} 
   >>>
 
   output {
