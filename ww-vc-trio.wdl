@@ -202,7 +202,7 @@ workflow ww_vc_trio {
         ref_name = ref_name,
         annovar_operation = annovar_operation,
         annovar_protocols = annovar_protocols,
-        docker = perlDocker
+        docker = annovarDocker
     }
 
     # Annotate variants
@@ -212,7 +212,7 @@ workflow ww_vc_trio {
         ref_name = ref_name,
         annovar_operation = annovar_operation,
         annovar_protocols = annovar_protocols,
-        docker = perlDocker
+        docker = annovarDocker
     }
     
     # Annotate variants
@@ -222,7 +222,7 @@ workflow ww_vc_trio {
         ref_name = ref_name,
         annovar_operation = annovar_operation,
         annovar_protocols = annovar_protocols,
-        docker = perlDocker
+        docker = annovarDocker
     }
 
     call consensusProcessingR {
