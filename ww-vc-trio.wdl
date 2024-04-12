@@ -279,6 +279,7 @@ task annovar {
       -protocol "~{annovar_protocols}" \
       -operation "~{annovar_operation}" \
       -nastring . -vcfinput
+    sed -i "s/Otherinfo1\tOtherinfo2\tOtherinfo3\tOtherinfo4\tOtherinfo5\tOtherinfo6\tOtherinfo7\tOtherinfo8\tOtherinfo9\tOtherinfo10\tOtherinfo11\tOtherinfo12\tOtherinfo13/Otherinfo/g" "~{base_vcf_name}.~{ref_name}_multianno.txt"
   >>>
 
   output {
@@ -499,7 +500,7 @@ task consensusProcessingR {
 
   command <<<
     set -eo pipefail
-    Rscript consensus-trio-unpaired.R "~{GATKVars}" "~{SAMVars}" "~{MutectVars}" "~{base_file_name}"
+    Rscript /consensus-trio-unpaired.R "~{GATKVars}" "~{SAMVars}" "~{MutectVars}" "~{base_file_name}"
   >>>
 
   output {
