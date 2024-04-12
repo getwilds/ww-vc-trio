@@ -48,7 +48,7 @@ workflow ww_vc_trio {
   String bwaDocker = "ghcr.io/getwilds/bwa:0.7.17"
   String bedtoolsDocker = "ghcr.io/getwilds/bedtools:2.31.1" 
   String bcftoolsDocker = "ghcr.io/getwilds/bcftools:1.19"
-  String annovarDocker = "ghcr.io/getwilds/annovar:${ref_name}"
+  String annovarDocker = "ghcr.io/getwilds/annovar:~{ref_name}"
   String RDocker = "ghcr.io/getwilds/consensus:0.1.1"
 
   Int bwaThreads = 16
@@ -373,7 +373,7 @@ task bcftoolsMpileup {
       --ignore-RG \
       --no-BAQ \
       "~{input_bam}" | bcftools call -Oz -mv \
-          -o "${base_file_name}.SAM.vcf.gz"
+          -o "~{base_file_name}.SAM.vcf.gz"
   >>>
 
   output {
@@ -447,7 +447,7 @@ task BwaMem {
   runtime {
     docker: docker
     memory: "32GB"
-    cpu: "${threads}"
+    cpu: "~{threads}"
   }
 }
 
