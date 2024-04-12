@@ -38,23 +38,18 @@ workflow ww_vc_trio {
     File af_only_gnomad
     File af_only_gnomad_index
     # Note:  For Annovar, please reference: Wang K, Li M, Hakonarson H. ANNOVAR: Functional annotation of genetic variants from next-generation sequencing data Nucleic Acids Research, 38:e164, 2010
-    File annovarTAR
     String annovar_protocols
     String annovar_operation
-    ## Specific script GitHub info for consensus
-    String githubRepoURL
-    String scriptPath
-    String githubTag
   }
 
   Array[Object] batchInfo = read_objects(batchFile)
   # Docker containers this workflow has been designed for
-  String GATKDocker = "broadinstitute/gatk:4.1.8.0"
-  String bwaDocker = "fredhutch/bwa:0.7.17"
-  String bedtoolsDocker = "fredhutch/bedtools:2.28.0" 
-  String bcftoolsDocker = "fredhutch/bcftools:1.9"
-  String perlDocker = "perl:5.28.0"
-  String RDocker = "rocker/tidyverse:3.6.0"
+  String GATKDocker = "ghcr.io/getwilds/gatk:4.3.0.0"
+  String bwaDocker = "ghcr.io/getwilds/bwa:0.7.17"
+  String bedtoolsDocker = "ghcr.io/getwilds/bedtools:2.31.1" 
+  String bcftoolsDocker = "ghcr.io/getwilds/bcftools:1.19"
+  String annovarDocker = "ghcr.io/getwilds/annovar:~{ref_name}"
+  String RDocker = "ghcr.io/getwilds/consensus:0.1.1"
 
   Int bwaThreads = 16
 
@@ -205,10 +200,9 @@ workflow ww_vc_trio {
       input:
         input_vcf = bcftoolsMpileup.output_vcf,
         ref_name = ref_name,
-        annovarTAR = annovarTAR,
         annovar_operation = annovar_operation,
         annovar_protocols = annovar_protocols,
-        docker = perlDocker
+        docker = annovarDocker
     }
 
     # Annotate variants
@@ -216,10 +210,9 @@ workflow ww_vc_trio {
       input:
         input_vcf = Mutect2TumorOnly.output_vcf,
         ref_name = ref_name,
-        annovarTAR = annovarTAR,
         annovar_operation = annovar_operation,
         annovar_protocols = annovar_protocols,
-        docker = perlDocker
+        docker = annovarDocker
     }
     
     # Annotate variants
@@ -227,10 +220,9 @@ workflow ww_vc_trio {
       input:
         input_vcf = HaplotypeCaller.output_vcf,
         ref_name = ref_name,
-        annovarTAR = annovarTAR,
         annovar_operation = annovar_operation,
         annovar_protocols = annovar_protocols,
-        docker = perlDocker
+        docker = annovarDocker
     }
 
     call consensusProcessingR {
@@ -239,9 +231,6 @@ workflow ww_vc_trio {
         MutectVars = annotateMutect.output_annotated_table,
         SAMVars = annotateSAM.output_annotated_table,
         base_file_name = base_file_name,
-        githubRepoURL = githubRepoURL,
-        githubTag = githubTag,
-        scriptPath = scriptPath,
         docker = RDocker
     }
   } # End scatter 
@@ -274,7 +263,6 @@ task annovar {
   input {
     File input_vcf
     String ref_name
-    File annovarTAR
     String annovar_protocols
     String annovar_operation
     String docker
@@ -284,19 +272,19 @@ task annovar {
 
   command <<<
     set -eo pipefail
-    tar -xzvf ${annovarTAR}
-    perl annovar/table_annovar.pl ${input_vcf} annovar/humandb/ \
-      -buildver ${ref_name} \
-      -outfile ${base_vcf_name} \
+    perl /annovar/table_annovar.pl "~{input_vcf}" /annovar/humandb/ \
+      -buildver "~{ref_name}" \
+      -outfile "~{base_vcf_name}" \
       -remove \
-      -protocol ${annovar_protocols} \
-      -operation ${annovar_operation} \
+      -protocol "~{annovar_protocols}" \
+      -operation "~{annovar_operation}" \
       -nastring . -vcfinput
+    sed -i "s/Otherinfo1\tOtherinfo2\tOtherinfo3\tOtherinfo4\tOtherinfo5\tOtherinfo6\tOtherinfo7\tOtherinfo8\tOtherinfo9\tOtherinfo10\tOtherinfo11\tOtherinfo12\tOtherinfo13/Otherinfo/g" "~{base_vcf_name}.~{ref_name}_multianno.txt"
   >>>
 
   output {
-    File output_annotated_vcf = "${base_vcf_name}.${ref_name}_multianno.vcf"
-    File output_annotated_table = "${base_vcf_name}.${ref_name}_multianno.txt"
+    File output_annotated_vcf = "~{base_vcf_name}.~{ref_name}_multianno.vcf"
+    File output_annotated_table = "~{base_vcf_name}.~{ref_name}_multianno.txt"
   }
 
   runtime {
@@ -327,31 +315,31 @@ task ApplyBaseRecalibrator {
     set -eo pipefail
     gatk --java-options "-Xms8g" \
       BaseRecalibrator \
-        -R ${ref_fasta} \
-        -I ${input_bam} \
-        -O ${base_file_name}.recal_data.csv \
-        --known-sites ${dbSNP_vcf} \
-        --known-sites ${sep=" --known-sites " known_indels_sites_VCFs} \
-        --intervals ${intervals} \
+        -R "~{ref_fasta}" \
+        -I "~{input_bam}" \
+        -O "~{base_file_name}.recal_data.csv" \
+        --known-sites "~{dbSNP_vcf}" \
+        --known-sites ~{sep=" --known-sites " known_indels_sites_VCFs} \
+        --intervals ~{intervals} \
         --interval-padding 100 \
         --verbosity WARNING
     gatk --java-options "-Xms48g" \
       ApplyBQSR \
-        -bqsr ${base_file_name}.recal_data.csv \
-        -I ${input_bam} \
-        -O ${base_file_name}.recal.bam \
-        -R ${ref_fasta} \
-        --intervals ${intervals} \
+        -bqsr "~{base_file_name}.recal_data.csv" \
+        -I "~{input_bam}" \
+        -O "~{base_file_name}.recal.bam" \
+        -R "~{ref_fasta}" \
+        --intervals ~{intervals} \
         --interval-padding 100 \
         --verbosity WARNING
     # finds the current sort order of this bam file
-    samtools view -H ${base_file_name}.recal.bam | grep @SQ|sed 's/@SQ\tSN:\|LN://g' > ${base_file_name}.sortOrder.txt
+    samtools view -H "~{base_file_name}.recal.bam" | grep @SQ|sed 's/@SQ\tSN:\|LN://g' > "~{base_file_name}.sortOrder.txt"
   >>>
 
   output {
-    File recalibrated_bam = "${base_file_name}.recal.bam"
-    File recalibrated_bai = "${base_file_name}.recal.bai"
-    File sortOrder = "${base_file_name}.sortOrder.txt"
+    File recalibrated_bam = "~{base_file_name}.recal.bam"
+    File recalibrated_bai = "~{base_file_name}.recal.bai"
+    File sortOrder = "~{base_file_name}.sortOrder.txt"
   }
 
   runtime {
@@ -381,16 +369,16 @@ task bcftoolsMpileup {
       --max-depth 10000 \
       --max-idepth 10000 \
       --annotate "FORMAT/AD,FORMAT/DP" \
-      --fasta-ref ${ref_fasta} \
-      --regions-file ${sorted_bed} \
+      --fasta-ref "~{ref_fasta}" \
+      --regions-file "~{sorted_bed}" \
       --ignore-RG \
       --no-BAQ \
-      ${input_bam} | bcftools call -Oz -mv \
-          -o ${base_file_name}.SAM.vcf.gz
+      "~{input_bam}" | bcftools call -Oz -mv \
+          -o "~{base_file_name}.SAM.vcf.gz"
   >>>
 
   output {
-    File output_vcf = "${base_file_name}.SAM.vcf.gz"
+    File output_vcf = "~{base_file_name}.SAM.vcf.gz"
   }
 
   runtime {
@@ -412,13 +400,13 @@ task bedToolsQC {
 
   command <<<
     set -eo pipefail
-    bedtools sort -g ${genome_sort_order} -i ${bed_file} > correctly.sorted.bed
-    bedtools coverage -mean -sorted -g ${genome_sort_order} -a correctly.sorted.bed \
-        -b ${input_bam} > ${base_file_name}.bedtoolsQCMean.txt
+    bedtools sort -g "~{genome_sort_order}" -i "~{bed_file}" > correctly.sorted.bed
+    bedtools coverage -mean -sorted -g "~{genome_sort_order}" -a correctly.sorted.bed \
+        -b "~{input_bam}" > "~{base_file_name}.bedtoolsQCMean.txt"
   >>>
 
   output {
-    File meanQC = "${base_file_name}.bedtoolsQCMean.txt"
+    File meanQC = "~{base_file_name}.bedtoolsQCMean.txt"
   }
 
   runtime {
@@ -450,7 +438,7 @@ task BwaMem {
     set -eo pipefail
     bwa mem \
       -p -v 2 -t ~{threads - 1} \
-      ~{ref_fasta} ~{input_fastq} | samtools view -1b > ~{base_file_name}.aligned.bam
+      "~{ref_fasta}" "~{input_fastq}" | samtools view -1b > "~{base_file_name}.aligned.bam"
   >>>
 
   output {
@@ -460,7 +448,7 @@ task BwaMem {
   runtime {
     docker: docker
     memory: "32GB"
-    cpu: "${threads}"
+    cpu: "~{threads}"
   }
 }
 
@@ -479,19 +467,19 @@ task CollectHsMetrics {
     set -eo pipefail
     gatk --java-options "-Xms2g" \
       CollectHsMetrics \
-      --INPUT ${input_bam} \
-      --OUTPUT ${base_file_name}.picard.metrics.txt \
-      --REFERENCE_SEQUENCE ${ref_fasta} \
+      --INPUT "~{input_bam}" \
+      --OUTPUT "~{base_file_name}.picard.metrics.txt" \
+      --REFERENCE_SEQUENCE "~{ref_fasta}" \
       --ALLELE_FRACTION 0.01 \
-      --BAIT_INTERVALS ${intervals} \
-      --TARGET_INTERVALS ${intervals} \
-      --PER_TARGET_COVERAGE ${base_file_name}.picard.pertarget.txt \
+      --BAIT_INTERVALS "~{intervals}" \
+      --TARGET_INTERVALS "~{intervals}" \
+      --PER_TARGET_COVERAGE "~{base_file_name}.picard.pertarget.txt" \
       --VERBOSITY WARNING
   >>>
 
   output {
-    File picardMetrics = "${base_file_name}.picard.metrics.txt"
-    File picardPerTarget = "${base_file_name}.picard.pertarget.txt"
+    File picardMetrics = "~{base_file_name}.picard.metrics.txt"
+    File picardPerTarget = "~{base_file_name}.picard.pertarget.txt"
   }
 
   runtime {
@@ -507,20 +495,16 @@ task consensusProcessingR {
     File SAMVars
     File MutectVars
     String base_file_name
-    String githubRepoURL
-    String scriptPath
-    String githubTag
     String docker
   }
 
   command <<<
     set -eo pipefail
-    git clone --branch ${githubTag} ${githubRepoURL}
-    Rscript ${scriptPath} ${GATKVars} ${SAMVars} ${MutectVars} ${base_file_name} 
+    Rscript /consensus-trio-unpaired.R "~{GATKVars}" "~{SAMVars}" "~{MutectVars}" "~{base_file_name}"
   >>>
 
   output {
-    File consensusTSV = "${base_file_name}.consensus.tsv"
+    File consensusTSV = "~{base_file_name}.consensus.tsv"
   }
 
   runtime {
@@ -549,18 +533,18 @@ task HaplotypeCaller {
     set -eo pipefail
     gatk --java-options "-Xms8g" \
       HaplotypeCaller \
-      -R ${ref_fasta} \
-      -I ${input_bam} \
-      -O ${base_file_name}.GATK.vcf.gz \
-      --dbsnp ${dbSNP_vcf} \
-      --intervals ${intervals} \
+      -R "~{ref_fasta}" \
+      -I "~{input_bam}" \
+      -O "~{base_file_name}.GATK.vcf.gz" \
+      --dbsnp "~{dbSNP_vcf}" \
+      --intervals "~{intervals}" \
       --interval-padding 100 \
       --verbosity WARNING 
   >>>
 
   output {
-    File output_vcf = "${base_file_name}.GATK.vcf.gz"
-    File output_vcf_index = "${base_file_name}.GATK.vcf.gz.tbi"
+    File output_vcf = "~{base_file_name}.GATK.vcf.gz"
+    File output_vcf_index = "~{base_file_name}.GATK.vcf.gz.tbi"
   }
 
   runtime {
@@ -586,10 +570,10 @@ task MergeBamAlignment {
     set -eo pipefail
     gatk --java-options "-Dsamjdk.compression_level=5 -XX:-UseGCOverheadLimit -Xms12g" \
       MergeBamAlignment \
-     --ALIGNED_BAM ${aligned_bam} \
-     --UNMAPPED_BAM ${unmapped_bam} \
-     --OUTPUT ${base_file_name}.merged.bam \
-     --REFERENCE_SEQUENCE ${ref_fasta} \
+     --ALIGNED_BAM "~{aligned_bam}" \
+     --UNMAPPED_BAM "~{unmapped_bam}" \
+     --OUTPUT "~{base_file_name}.merged.bam" \
+     --REFERENCE_SEQUENCE "~{ref_fasta}" \
      --PAIRED_RUN true \
      --CREATE_INDEX false \
      --CLIP_ADAPTERS true \
@@ -598,7 +582,7 @@ task MergeBamAlignment {
   >>>
 
   output {
-    File output_bam = "${base_file_name}.merged.bam"
+    File output_bam = "~{base_file_name}.merged.bam"
   }
 
   runtime {
@@ -627,25 +611,25 @@ task Mutect2TumorOnly {
     set -eo pipefail
     gatk --java-options "-Xms16g" \
       Mutect2 \
-        -R ${ref_fasta} \
-        -I ${input_bam} \
+        -R "~{ref_fasta}" \
+        -I "~{input_bam}" \
         -O preliminary.vcf.gz \
-        --intervals ${intervals} \
+        --intervals "~{intervals}" \
         --interval-padding 100 \
-        --germline-resource ${genomeReference} \
+        --germline-resource "~{genomeReference}" \
         --verbosity WARNING
     gatk --java-options "-Xms16g" \
       FilterMutectCalls \
         -V preliminary.vcf.gz \
-        -O ${base_file_name}.mutect2.vcf.gz \
-        -R ${ref_fasta} \
+        -O "~{base_file_name}.mutect2.vcf.gz" \
+        -R "~{ref_fasta}" \
         --stats preliminary.vcf.gz.stats \
         --verbosity WARNING
   >>>
 
   output {
-    File output_vcf = "${base_file_name}.mutect2.vcf.gz"
-    File output_vcf_index = "${base_file_name}.mutect2.vcf.gz.tbi"
+    File output_vcf = "~{base_file_name}.mutect2.vcf.gz"
+    File output_vcf_index = "~{base_file_name}.mutect2.vcf.gz.tbi"
   }
 
   runtime {
@@ -668,21 +652,21 @@ task SamToFastq {
     set -eo pipefail
     gatk --java-options "-Dsamjdk.compression_level=5 -Xms12g" \
       SortSam \
-     --INPUT ${input_bam} \
+     --INPUT "~{input_bam}" \
      --OUTPUT sorted.bam \
      --SORT_ORDER queryname \
      --VERBOSITY WARNING
     gatk --java-options "-Dsamjdk.compression_level=5 -Xms8g" \
       SamToFastq \
       --INPUT sorted.bam \
-      --FASTQ ${base_file_name}.fastq \
+      --FASTQ "~{base_file_name}.fastq" \
       --INTERLEAVE true \
       --INCLUDE_NON_PF_READS true \
       --VERBOSITY WARNING
   >>>
 
   output {
-    File output_fastq = "${base_file_name}.fastq"
+    File output_fastq = "~{base_file_name}.fastq"
   }
 
   runtime {
@@ -702,12 +686,12 @@ task SortBed {
 
   command <<<
     set -eo pipefail
-    sort -k1,1V -k2,2n -k3,3n ${unsorted_bed} > sorted.bed
+    sort -k1,1V -k2,2n -k3,3n "~{unsorted_bed}" > sorted.bed
     gatk --java-options "-Dsamjdk.compression_level=5 -Xms4g" \
       BedToIntervalList \
       --INPUT sorted.bed \
       --OUTPUT sorted.interval_list \
-      --SEQUENCE_DICTIONARY ${ref_dict} 
+      --SEQUENCE_DICTIONARY "~{ref_dict}"
   >>>
 
   output {
@@ -736,18 +720,18 @@ task MarkDuplicates {
   command <<<
     gatk --java-options "-Dsamjdk.compression_level=5 -Xms16g" \
       MarkDuplicates \
-      --INPUT ${input_bam} \
-      --OUTPUT ${output_bam_basename}.bam \
-      --METRICS_FILE ${metrics_filename} \
+      --INPUT "~{input_bam}" \
+      --OUTPUT "~{output_bam_basename}.bam" \
+      --METRICS_FILE "~{metrics_filename}" \
       --OPTICAL_DUPLICATE_PIXEL_DISTANCE 2500 \
       --VERBOSITY WARNING
-    samtools index ${output_bam_basename}.bam
+    samtools index "~{output_bam_basename}.bam"
   >>>
 
   output {
-    File output_bam = "${output_bam_basename}.bam"
-    File output_bai = "${output_bam_basename}.bam.bai"
-    File duplicate_metrics = "${metrics_filename}"
+    File output_bam = "~{output_bam_basename}.bam"
+    File output_bai = "~{output_bam_basename}.bam.bai"
+    File duplicate_metrics = "~{metrics_filename}"
   }
 
   runtime {
@@ -769,14 +753,14 @@ task SortSam {
     set -eo pipefail
     gatk --java-options "-Dsamjdk.compression_level=5 -Xms12g" \
       SortSam \
-     --INPUT ${input_bam} \
-     --OUTPUT ${base_file_name}.sorted.bam \
+     --INPUT "~{input_bam}" \
+     --OUTPUT "~{base_file_name}.sorted.bam" \
      --SORT_ORDER queryname \
      --VERBOSITY WARNING
   >>>
 
   output {
-    File output_bam = "${base_file_name}.sorted.bam"
+    File output_bam = "~{base_file_name}.sorted.bam"
   }
 
   runtime {
