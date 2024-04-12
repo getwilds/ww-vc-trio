@@ -5,7 +5,7 @@ This WILDS WDL workflow takes samples through a standard alignment protocol and 
 
 ## Usage
 
-For Fred Hutch users that are new to WDL, we recommend using [PROOF](https://sciwiki.fredhutch.org/dasldemos/proof-how-to/) to submit this workflow directly to the on-premise HPC cluster, as it simplifies interaction with Cromwell and provides a user-friendly front-end for job submission and tracking. For users outside of Fred Hutch or more advanced users who would like to run the workflow locally, command line execution is relatively simple: 
+For Fred Hutch users that are new to WDL, we recommend using [PROOF](https://sciwiki.fredhutch.org/dasldemos/proof-how-to/) to submit this workflow directly to the on-premise HPC cluster, as it simplifies interaction with Cromwell and provides a user-friendly front-end for job submission and tracking. For users outside of Fred Hutch or more advanced users who would like to run the workflow locally, command line execution is relatively straightforward: 
 ```
 java -jar cromwell-86.jar run ww-vc-trio.wdl \
     --inputs ww-vc-trio-inputs.json \
