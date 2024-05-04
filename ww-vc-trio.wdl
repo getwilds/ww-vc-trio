@@ -509,7 +509,7 @@ task consensusProcessingR {
 
   runtime {
     cpu: 1
-    memory: "2 GB"
+    memory: "8 GB"
     docker: docker
   }
 }
