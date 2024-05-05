@@ -484,8 +484,8 @@ task CollectHsMetrics {
 
   runtime {
     docker: docker
-    cpu: 2
-    memory: "16 GB"
+    cpu: 4
+    memory: "32 GB"
   }
 }
 
