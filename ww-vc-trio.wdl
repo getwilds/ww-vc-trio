@@ -465,7 +465,7 @@ task CollectHsMetrics {
 
   command <<<
     set -eo pipefail
-    gatk --java-options "-Xms2g" \
+    gatk --java-options "-Xms16g" \
       CollectHsMetrics \
       --INPUT "~{input_bam}" \
       --OUTPUT "~{base_file_name}.picard.metrics.txt" \
@@ -484,8 +484,8 @@ task CollectHsMetrics {
 
   runtime {
     docker: docker
-    cpu: 1
-    memory: "12 GB"
+    cpu: 2
+    memory: "16 GB"
   }
 }
 
