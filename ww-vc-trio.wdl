@@ -44,12 +44,12 @@ workflow ww_vc_trio {
 
   Array[Object] batchInfo = read_objects(batchFile)
   # Docker containers this workflow has been designed for
-  String GATKDocker = "ghcr.io/getwilds/gatk:4.3.0.0"
-  String bwaDocker = "ghcr.io/getwilds/bwa:0.7.17"
-  String bedtoolsDocker = "ghcr.io/getwilds/bedtools:2.31.1" 
-  String bcftoolsDocker = "ghcr.io/getwilds/bcftools:1.19"
-  String annovarDocker = "ghcr.io/getwilds/annovar:~{ref_name}"
-  String RDocker = "ghcr.io/getwilds/consensus:0.1.1"
+  String GATKDocker = "getwilds/gatk:4.3.0.0"
+  String bwaDocker = "getwilds/bwa:0.7.17"
+  String bedtoolsDocker = "getwilds/bedtools:2.31.1" 
+  String bcftoolsDocker = "getwilds/bcftools:1.19"
+  String annovarDocker = "getwilds/annovar:~{ref_name}"
+  String RDocker = "getwilds/consensus:0.1.1"
 
   Int bwaThreads = 16
 
